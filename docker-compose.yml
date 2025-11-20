@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  vstad-db:
+    image: postgres:15-alpine
+    container_name: vstad-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-video_upload_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "3623:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - video_network
+
+  vstad-minio:
+    image: minio/minio:latest
+    container_name: vstad-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "3930:9000"  # External:Internal - External 3930 maps to internal 9000
+      - "3931:9001"  # External:Internal - External 3931 maps to internal 9001
+    command: server /data --console-address ":9001"  # Use internal port 9001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]  # Use internal port 9000
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - video_network
+
+  vstad-api:
+    build: .
+    container_name: vstad-api
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@vstad-db:5432/${DB_NAME:-video_upload_db}
+      
+      # MinIO Configuration
+      MINIO_ENDPOINT: vstad-minio:9000  # Use internal port 9000, NOT 3930
+      MINIO_EXTERNAL_ENDPOINT: localhost:3930  # External access uses 3930
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-videos}
+
+      # JWT Configuration
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-129600}
+      
+      # App Configuration
+      DEBUG: ${DEBUG:-False}
+    volumes:
+      - profile_images:/app/profile_images
+    ports:
+      - "3167:8000"
+    depends_on:
+      vstad-db:
+        condition: service_healthy
+      vstad-minio:
+        condition: service_healthy
+    command: bash -c "python scripts/init_db.py && uvicorn main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - video_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  minio_data:
+  profile_images:
+
+networks:
+  video_network:
+    driver: bridge
