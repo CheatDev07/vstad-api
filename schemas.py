@@ -208,7 +208,7 @@ class VideoResponse(BaseModel):
     description: Optional[str]
     file_name: str
     file_size: int
-    video_url:str
+    video_url:Optional[str]=None
     duration: Optional[float]
     width: Optional[int]
     height: Optional[int]

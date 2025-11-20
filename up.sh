@@ -2,7 +2,7 @@
 docker-compose down
 
 # Rebuild the images
-# docker-compose build --no-cache
+docker-compose build --no-cache
 
 # Start containers
 docker-compose up -d

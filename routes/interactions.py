@@ -206,11 +206,11 @@ def unfavorite_video(video_id: int, db: Session = Depends(get_db), current_user:
     
     return {"message": "Removed from favorites"}
 
-@router.get("/user/favorites", response_model=list[int])
-def get_user_favorites(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Get user's favorite video IDs"""
-    favorites = db.query(Favorite.video_id).filter(Favorite.user_id == current_user.id).all()
-    return [fav[0] for fav in favorites]
+# @router.get("/user/favorites", response_model=list[int])
+# def get_user_favorites(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+#     """Get user's favorite video IDs"""
+#     favorites = db.query(Favorite.video_id).filter(Favorite.user_id == current_user.id).all()
+#     return [fav[0] for fav in favorites]
 
 @router.get("/user/favorite-videos", response_model=list[FavoriteDetailResponse])
 def get_user_favorite_videos(

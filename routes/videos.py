@@ -413,7 +413,13 @@ def list_my_videos(
     total = db.query(Video).filter(Video.uploader_id == current_user.id).count()
     videos = db.query(Video).filter(
         Video.uploader_id == current_user.id
-    ).order_by(desc(Video.created_at)).offset(skip).limit(limit).all()
+    ).order_by(desc(Video.created_at)).offset(skip).limit(limit).all()     
+
+    videos_response = []
+    for v in videos:
+        if not v.video_url:
+            v.video_url = minio_client.get_object_url(v.file_name)
+        videos_response.append(v)   
     
     return VideoListResponse(total=total, skip=skip, limit=limit, videos=videos)
 
@@ -484,43 +490,43 @@ def delete_video(
     
     return {"message": "Video deleted successfully"}
 
-@router.get("/{video_id}/download")
-def download_video(
-    video_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Download video (only uploader can download)"""
-    video = db.query(Video).filter(Video.id == video_id).first()
-    if not video:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+# @router.get("/{video_id}/download")
+# def download_video(
+#     video_id: int,
+#     current_user: User = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """Download video (only uploader can download)"""
+#     video = db.query(Video).filter(Video.id == video_id).first()
+#     if not video:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
     
-    if video.uploader_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to download this video")
+#     if video.uploader_id != current_user.id:
+#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to download this video")
     
-    # Get download URL from MinIO
-    url = minio_client.get_object_url(video.file_path, expiration=3600)
-    if not url:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate download URL")
+#     # Get download URL from MinIO
+#     url = minio_client.get_object_url(video.file_path, expiration=3600)
+#     if not url:
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate download URL")
     
-    return {"download_url": url}
+#     return {"download_url": url}
 
-@router.get("/{video_id}/stream")
-def stream_video(video_id: int, db: Session = Depends(get_db)):
-    """Stream video (public access with range requests)"""
-    video = db.query(Video).filter(Video.id == video_id).first()
-    if not video:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
+# @router.get("/{video_id}/stream")
+# def stream_video(video_id: int, db: Session = Depends(get_db)):
+#     """Stream video (public access with range requests)"""
+#     video = db.query(Video).filter(Video.id == video_id).first()
+#     if not video:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
     
-    if not video.is_public:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Video is private")
+#     if not video.is_public:
+#         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Video is private")
     
-    # Get stream URL from MinIO
-    url = minio_client.get_object_url(video.file_path, expiration=3600)
-    if not url:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate stream URL")
+#     # Get stream URL from MinIO
+#     url = minio_client.get_object_url(video.file_path, expiration=3600)
+#     if not url:
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate stream URL")
     
-    return {"stream_url": url}
+#     return {"stream_url": url}
 
 @router.get("/uploader/{uploader_id}/videos", response_model=VideoListResponse)
 def get_uploader_videos(
